@@ -13,12 +13,12 @@ It needs to track different authorization mechanics:
 - Custom Guards
 
 ## Installation
-Require SineMah/gate-guardian and add GitHub repository in your `composer.json`.
+Require sinema/gate-guardian and add GitHub repository in your `composer.json`.
 ``` json
 {
     "require": {
         "php": "^8.2.0",
-        "SineMah/gate-guardian": "dev-main",
+        "sinema/gate-guardian": "dev-main",
     },
     "repositories": [
         {
