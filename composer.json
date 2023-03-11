@@ -1,5 +1,5 @@
 {
-    "name": "sinemah/gate-guardian",
+    "name": "sinema/gate-guardian",
     "description": "Guard; Checks JWTs against different guard types; default is Zitadel",
     "keywords": [
         "laravel",
@@ -34,11 +34,5 @@
         }
     },
     "require-dev": {},
-    "repositories": [
-        {
-            "type": "vcs",
-            "url": "https://github.com/wg-hyve/laravel-keycloak-guard.git"
-        }
-    ],
     "minimum-stability": "dev"
 }
