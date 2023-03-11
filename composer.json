@@ -1,0 +1,44 @@
+{
+    "name": "sinemah/gate-guardian",
+    "description": "Guard; Checks JWTs against different guard types; default is Zitadel",
+    "keywords": [
+        "laravel",
+        "zitadel",
+        "pkce"
+    ],
+    "homepage": "https://github.com/SineMah/gate-guardian.git",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Sinema"
+        }
+    ],
+    "prefer-stable": true,
+    "require": {
+        "php": "^8.2.0",
+        "laravel/framework": "^10.0",
+        "sinema/json-api-error-laravel": "^0.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "GateGuardian\\": "src/"
+        }
+    },
+    "autoload-dev": {},
+    "scripts": {},
+    "extra": {
+        "laravel": {
+            "providers": [
+                "GateGuardian\\GuardServiceProvider"
+            ]
+        }
+    },
+    "require-dev": {},
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/wg-hyve/laravel-keycloak-guard.git"
+        }
+    ],
+    "minimum-stability": "dev"
+}
