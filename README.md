@@ -1,4 +1,4 @@
-# CloakPort
+# GateGuardian
 - [Requirements and limits](#requirements)
 - [Installation](#installation)
 - [Usage](#usage)
