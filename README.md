@@ -17,7 +17,7 @@ Require SineMah/gate-guardian and add GitHub repository in your `composer.json`.
 ``` json
 {
     "require": {
-        "php": "^8.1.0",
+        "php": "^8.2.0",
         "SineMah/gate-guardian": "dev-main",
     },
     "repositories": [
