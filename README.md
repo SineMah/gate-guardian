@@ -8,6 +8,7 @@
 ## Requirements
 
 This package proofs an instance of Zitadel User authorizations with JWT.
+Make sure you configure Zitadel JWTs as access tokens and pass roles.
 It needs to track different authorization mechanics:
 - Zitadel (PKCE)
 - Custom Guards
