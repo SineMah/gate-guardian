@@ -18,7 +18,7 @@ class GuardLoader
      */
     public static function load(array $config): ProxyGuard
     {
-        $guardName = count(array_intersect(config('gate_guardian')['key_identifier'], array_keys(self::tokenPayload()))) > 0 ? 'keycloak' : 'passport_user';
+        $guardName = count(array_intersect(config('gate_guardian')['key_identifier'], array_keys(self::tokenPayload()))) > 0 ? 'zitadel' : 'default';
         $guard = GuardType::load($guardName)->loadFrom($config);
 
         self::$loaded[] = $guard->name();

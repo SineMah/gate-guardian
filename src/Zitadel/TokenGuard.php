@@ -2,12 +2,23 @@
 
 namespace GateGuardian\Zitadel;
 
+use Firebase\JWT\JWK;
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
+use GateGuardian\Creator\Exceptions\ValidationUrlMissing;
 use GateGuardian\GuardContract;
 use Illuminate\Contracts\Auth\Guard;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Arr;
+use Illuminate\Contracts\Auth\Authenticatable as Authenticatable;
+use Illuminate\Support\Facades\Http;
+use Ramsey\Uuid\Uuid;
+use Throwable;
 
 class TokenGuard implements Guard, GuardContract
 {
+    protected ?array $decodedToken = null;
+    protected string $uuid = 'dfe95955-804d-491e-82fa-00756b087a66';
+
     public static function load(array $config): self
     {
         return new self();
@@ -18,9 +29,17 @@ class TokenGuard implements Guard, GuardContract
         return null;
     }
 
+    /**
+     * @throws Throwable
+     */
     public function validate(array $credentials = [])
     {
-        return true;
+        if($this->validateToken()) {
+
+            $this->loadToken();
+        }
+
+        return $this->decodedToken !== null;
     }
 
     public function id()
@@ -30,7 +49,7 @@ class TokenGuard implements Guard, GuardContract
 
     public function check()
     {
-        return false;
+        return $this->decodedToken !== null;
     }
 
     public function client()
@@ -53,10 +72,23 @@ class TokenGuard implements Guard, GuardContract
         return false;
     }
 
-    public function hasRole(array $resource, string $role): bool
+    public function roles(): array
     {
-        return true;
+        $roles = [];
+        $keyValue = array_values(Arr::only($this->decodedToken, config('gate_guardian.key_identifier')));
+
+        foreach ($keyValue as $role) {
+            $roles = array_merge($roles, array_keys($role));
+        }
+
+        return array_unique($roles);
     }
+
+    public function hasRole(string $role): bool
+    {
+        return in_array($role, $this->roles());
+    }
+
     public function scopes(): array
     {
         return [];
@@ -64,11 +96,52 @@ class TokenGuard implements Guard, GuardContract
 
     public function hasScope(string|array $scope): bool
     {
-        return true;
+        return false;
     }
 
     public function name(): string
     {
         return 'zitadel';
+    }
+
+    /**
+     * @throws Throwable
+     */
+    protected function validateToken(): bool
+    {
+        $ttl = config('gate_guardian.cache_ttl');
+        $hash = Uuid::uuid5($this->uuid, request()->header('Authorization'));
+        $validateUrl = config('gate_guardian.validate_jwt_url');
+
+        throw_if($validateUrl === null, ValidationUrlMissing::class);
+
+        $validated = cache()->remember(sprintf('jwt.%s', $hash), $ttl, function () use ($validateUrl) {
+            $response = Http::withHeaders(
+                ['Authorization' => request()->header('Authorization')]
+            )->get($validateUrl);
+
+            return $response->status() === 200 && $response->json('locale') !== null;
+        });
+
+        if($jwkUrl = config('gate_guardian.jwk_uri')) {
+            $keys = cache()->remember('jwk.zitadel', $ttl, fn () =>
+                Http::get($jwkUrl)->json()
+            );
+
+            JWT::$leeway = config('gate_guardian.leeway');
+
+            JWT::decode(str_replace('Bearer ', '', request()->header('Authorization')), JWK::parseKeySet($keys));
+        }
+
+        return $validated;
+    }
+
+    protected function loadToken(): void
+    {
+        $accessToken = str_replace('Bearer ', '', request()->header('Authorization'));
+        $tks = explode('.', $accessToken);
+        [$headb64, $bodyb64, $cryptob64] = $tks;
+
+        $this->decodedToken = json_decode(JWT::urlsafeB64Decode($bodyb64), true);
     }
 }

@@ -17,7 +17,8 @@
     "require": {
         "php": "^8.2.0",
         "laravel/framework": "^10.0",
-        "sinema/json-api-error-laravel": "^0.2"
+        "sinema/json-api-error-laravel": "^0.2",
+        "firebase/php-jwt": "^6.4"
     },
     "autoload": {
         "psr-4": {
@@ -33,6 +34,5 @@
             ]
         }
     },
-    "require-dev": {},
     "minimum-stability": "dev"
 }
