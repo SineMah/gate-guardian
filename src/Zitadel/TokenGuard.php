@@ -4,15 +4,12 @@ namespace GateGuardian\Zitadel;
 
 use Firebase\JWT\JWK;
 use Firebase\JWT\JWT;
-use Firebase\JWT\Key;
-use GateGuardian\Creator\Exceptions\ValidationUrlMissing;
 use GateGuardian\GuardContract;
 use Illuminate\Contracts\Auth\Guard;
 use Illuminate\Support\Arr;
 use Illuminate\Contracts\Auth\Authenticatable as Authenticatable;
 use Illuminate\Support\Facades\Http;
 use Ramsey\Uuid\Uuid;
-use Throwable;
 
 class TokenGuard implements Guard, GuardContract
 {
@@ -29,12 +26,9 @@ class TokenGuard implements Guard, GuardContract
         return null;
     }
 
-    /**
-     * @throws Throwable
-     */
     public function validate(array $credentials = [])
     {
-        if($this->validateToken()) {
+        if($this->valdiateToken()) {
 
             $this->loadToken();
         }
@@ -84,9 +78,14 @@ class TokenGuard implements Guard, GuardContract
         return array_unique($roles);
     }
 
-    public function hasRole(string $role): bool
+    public function hasRole(array|string $roles): bool
     {
-        return in_array($role, $this->roles());
+        return count(
+                array_intersect(
+                    $this->roles(),
+                    is_string($roles) ? [$roles] : $roles
+                )
+            ) > 0;
     }
 
     public function scopes(): array
@@ -94,9 +93,19 @@ class TokenGuard implements Guard, GuardContract
         return [];
     }
 
-    public function hasScope(string|array $scope): bool
+    public function hasScope(string|array $scopes): bool
     {
-        return false;
+        return count(
+                array_intersect(
+                    $this->scopes(),
+                    is_string($scopes) ? [$scopes] : $scopes
+                )
+            ) > 0;
+    }
+
+    public function claims(): array
+    {
+        return $this->decodedToken;
     }
 
     public function name(): string
@@ -104,31 +113,22 @@ class TokenGuard implements Guard, GuardContract
         return 'zitadel';
     }
 
-    /**
-     * @throws Throwable
-     */
-    protected function validateToken(): bool
+    protected function valdiateToken(): bool
     {
         $ttl = config('gate_guardian.cache_ttl');
         $hash = Uuid::uuid5($this->uuid, request()->header('Authorization'));
-        $validateUrl = config('gate_guardian.validate_jwt_url');
-
-        throw_if($validateUrl === null, ValidationUrlMissing::class);
-
-        $validated = cache()->remember(sprintf('jwt.%s', $hash), $ttl, function () use ($validateUrl) {
+        $validated = cache()->remember(sprintf('jwt.%s', $hash), $ttl, function () {
             $response = Http::withHeaders(
                 ['Authorization' => request()->header('Authorization')]
-            )->get($validateUrl);
+            )->get(config('gate_guardian.validate_jwt_url'));
 
             return $response->status() === 200 && $response->json('locale') !== null;
         });
 
         if($jwkUrl = config('gate_guardian.jwk_uri')) {
             $keys = cache()->remember('jwk.zitadel', $ttl, fn () =>
-                Http::get($jwkUrl)->json()
+            Http::get($jwkUrl)->json()
             );
-
-            JWT::$leeway = config('gate_guardian.leeway');
 
             JWT::decode(str_replace('Bearer ', '', request()->header('Authorization')), JWK::parseKeySet($keys));
         }

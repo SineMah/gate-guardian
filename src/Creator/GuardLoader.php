@@ -2,6 +2,7 @@
 
 namespace GateGuardian\Creator;
 
+use Exception;
 use GateGuardian\Creator\Exceptions\MissingBearerToken;
 use GateGuardian\Creator\Traits\HasMagicCall;
 use GateGuardian\GuardContract;
@@ -19,7 +20,7 @@ class GuardLoader
     public static function load(array $config): ProxyGuard
     {
         $guardName = count(array_intersect(config('gate_guardian')['key_identifier'], array_keys(self::tokenPayload()))) > 0 ? 'zitadel' : 'default';
-        $guard = GuardType::load($guardName)->loadFrom($config);
+        $guard = self::getGuard($guardName, $config);
 
         self::$loaded[] = $guard->name();
 
@@ -68,5 +69,18 @@ class GuardLoader
         }
 
         throw new MissingBearerToken();
+    }
+
+    private static function getGuard($name, $config): GuardContract
+    {
+        $gardTypeClass = config('gate_guardian')['factory'];
+
+        try {
+            $guard = $gardTypeClass::load($name)->loadFrom($config);
+        }catch(Exception $e) {
+            $guard = $gardTypeClass::load('none')->loadFrom($config);
+        }
+
+        return $guard;
     }
 }
