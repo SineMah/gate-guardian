@@ -2,8 +2,10 @@
 
 namespace GateGuardian\Zitadel;
 
+use Firebase\JWT\ExpiredException;
 use Firebase\JWT\JWK;
 use Firebase\JWT\JWT;
+use GateGuardian\Creator\Exceptions\ExpiredBearerToken;
 use GateGuardian\GuardContract;
 use Illuminate\Contracts\Auth\Guard;
 use Illuminate\Support\Arr;
@@ -26,9 +28,12 @@ class TokenGuard implements Guard, GuardContract
         return null;
     }
 
+    /**
+     * @throws ExpiredBearerToken
+     */
     public function validate(array $credentials = [])
     {
-        if($this->valdiateToken()) {
+        if($this->validateToken()) {
 
             $this->loadToken();
         }
@@ -113,7 +118,10 @@ class TokenGuard implements Guard, GuardContract
         return 'zitadel';
     }
 
-    protected function valdiateToken(): bool
+    /**
+     * @throws ExpiredBearerToken
+     */
+    protected function validateToken(): bool
     {
         $ttl = config('gate_guardian.cache_ttl');
         $hash = Uuid::uuid5($this->uuid, request()->header('Authorization'));
@@ -130,7 +138,11 @@ class TokenGuard implements Guard, GuardContract
             Http::get($jwkUrl)->json()
             );
 
-            JWT::decode(str_replace('Bearer ', '', request()->header('Authorization')), JWK::parseKeySet($keys));
+            try {
+                JWT::decode(str_replace('Bearer ', '', request()->header('Authorization')), JWK::parseKeySet($keys));
+            }catch(ExpiredException $e) {
+                throw new ExpiredBearerToken();
+            }
         }
 
         return $validated;
