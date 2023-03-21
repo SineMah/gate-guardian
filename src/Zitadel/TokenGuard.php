@@ -12,11 +12,18 @@ use Illuminate\Support\Arr;
 use Illuminate\Contracts\Auth\Authenticatable as Authenticatable;
 use Illuminate\Support\Facades\Http;
 use Ramsey\Uuid\Uuid;
+use Throwable;
+use UnexpectedValueException;
 
 class TokenGuard implements Guard, GuardContract
 {
     protected ?array $decodedToken = null;
     protected string $uuid = 'dfe95955-804d-491e-82fa-00756b087a66';
+
+    protected string $jwkCacheKey = 'jwk.zitadel';
+    protected ?string $authorizationCacheKey = null;
+    protected int $validationMaxTries = 3;
+    protected int $validationTries = 0;
 
     public static function load(array $config): self
     {
@@ -123,29 +130,53 @@ class TokenGuard implements Guard, GuardContract
      */
     protected function validateToken(): bool
     {
-        $ttl = config('gate_guardian.cache_ttl');
-        $hash = Uuid::uuid5($this->uuid, request()->header('Authorization'));
-        $validated = cache()->remember(sprintf('jwt.%s', $hash), $ttl, function () {
+        $this->authorizationCacheKey = sprintf(
+            'jwt.%s',
+            Uuid::uuid5($this->uuid, request()->header('Authorization'))
+        );
+
+        return $this->validateTokenActive() && $this->validateWithJwk();
+    }
+
+    protected function validateTokenActive(): bool
+    {
+        return cache()->remember($this->authorizationCacheKey, config('gate_guardian.cache_ttl'), function () {
             $response = Http::withHeaders(
                 ['Authorization' => request()->header('Authorization')]
             )->get(config('gate_guardian.validate_jwt_url'));
 
             return $response->status() === 200 && $response->json('locale') !== null;
         });
+    }
 
-        if($jwkUrl = config('gate_guardian.jwk_uri')) {
-            $keys = cache()->remember('jwk.zitadel', $ttl, fn () =>
-            Http::get($jwkUrl)->json()
-            );
+    /**
+     * @throws ExpiredBearerToken
+     */
+    protected function validateWithJwk(): bool
+    {
+        if($keys = $this->loadJwk()) {
+
+            $this->validationTries++;
 
             try {
                 JWT::decode(str_replace('Bearer ', '', request()->header('Authorization')), JWK::parseKeySet($keys));
             }catch(ExpiredException $e) {
+
                 throw new ExpiredBearerToken();
+            }catch(UnexpectedValueException $e) {
+
+                cache()->forget($this->jwkCacheKey);
+
+                return $this->validateWithJwk();
+            }catch(Throwable $e) {
+
+                return false;
             }
+
+            return $this->validationTries <= $this->validationMaxTries;
         }
 
-        return $validated;
+        return true;
     }
 
     protected function loadToken(): void
@@ -155,5 +186,17 @@ class TokenGuard implements Guard, GuardContract
         [$headb64, $bodyb64, $cryptob64] = $tks;
 
         $this->decodedToken = json_decode(JWT::urlsafeB64Decode($bodyb64), true);
+    }
+
+    protected function loadJwk(): mixed
+    {
+        if($jwkUrl = config('gate_guardian.jwk_uri')) {
+
+            return cache()->remember($this->jwkCacheKey, config('gate_guardian.cache_ttl'), fn () =>
+                Http::get($jwkUrl)->json()
+            );
+        }
+
+        return null;
     }
 }
