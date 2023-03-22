@@ -57,10 +57,16 @@ class TokenGuard implements Guard, GuardContract
         return [];
     }
 
-    public function hasRole(string $role): bool
+    public function hasRole(array|string $roles): bool
     {
-        return true;
+        return false;
     }
+
+    public function claims(): array
+    {
+        return [];
+    }
+
     public function scopes(): array
     {
         return [];
